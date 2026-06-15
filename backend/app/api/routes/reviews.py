@@ -212,3 +212,54 @@ async def get_brushup(card_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     )
     
     return {"brushup": explanation}
+
+from app.services.sm2_service import calculate_next_review, calculate_forgetting_risk
+
+@router.get("/reviews/stats")
+async def get_review_stats(db: AsyncSession = Depends(get_db)):
+    """Get overview stats including at-risk concepts."""
+    
+    now = datetime.now(timezone.utc)
+    
+    # Get all cards with their concepts
+    result = await db.execute(
+        select(ReviewCard, Concept)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .order_by(ReviewCard.due_date)
+    )
+    rows = result.all()
+    
+    due_today = []
+    at_risk = []
+    overdue = []
+    safe = []
+    
+    for card, concept in rows:
+        risk_data = calculate_forgetting_risk(card.due_date, card.interval)
+        
+        item = {
+            "card_id": str(card.id),
+            "concept_title": concept.title,
+            "due_date": card.due_date.isoformat(),
+            "interval": card.interval,
+            "repetitions": card.repetitions,
+            **risk_data
+        }
+        
+        if risk_data["risk"] == "at_risk":
+            at_risk.append(item)
+        elif risk_data["risk"] == "overdue":
+            overdue.append(item)
+        elif risk_data["risk"] == "due_today":
+            due_today.append(item)
+        else:
+            safe.append(item)
+    
+    return {
+        "due_today": due_today,
+        "overdue": overdue,
+        "at_risk": at_risk,
+        "safe": safe,
+        "total_concepts": len(rows),
+        "needs_attention": len(due_today) + len(overdue) + len(at_risk)
+    }

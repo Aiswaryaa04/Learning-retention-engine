@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { uploadDocument, uploadPDF, getDueReviews, getDueReviewsByDocument, getQuestion, submitReview, evaluateAnswer, getBrushup } from './api'
 import History from './History'
 import './App.css'
+import Stats from './Stats'
 
 const Sidebar = ({ view, setView, startReview }) => (
   <div style={{
@@ -316,6 +317,8 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              <Stats onStartReview={startReview} />
             </div>
 
             {/* Quick stats */}
