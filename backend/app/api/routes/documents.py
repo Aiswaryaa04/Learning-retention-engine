@@ -1,25 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from app.db.session import get_db
 from app.models.document import Document
 from app.models.concept import Concept
 from app.models.review_card import ReviewCard
+from app.models.review_log import ReviewLog
 from app.schemas.document import DocumentCreate, DocumentResponse
 from app.schemas.concept import ConceptResponse
 from app.services.claude_service import extract_concepts
 from app.services.embedding_service import get_embedding
-from app.models.review_log import ReviewLog
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from app.services.pdf_service import extract_text_from_pdf
 import uuid
 import asyncio
 
 router = APIRouter()
 
+
 @router.post("/documents", response_model=DocumentResponse)
 async def create_document(doc: DocumentCreate, db: AsyncSession = Depends(get_db)):
-    
-    # 1. Save the document
+    """Upload content and extract concepts using Claude."""
+
     document = Document(
         id=uuid.uuid4(),
         title=doc.title,
@@ -30,7 +31,6 @@ async def create_document(doc: DocumentCreate, db: AsyncSession = Depends(get_db
     db.add(document)
     await db.flush()
 
-    # 2. Ask Claude to extract concepts (run sync function in thread)
     try:
         loop = asyncio.get_event_loop()
         concepts_data = await loop.run_in_executor(None, extract_concepts, doc.content)
@@ -38,10 +38,9 @@ async def create_document(doc: DocumentCreate, db: AsyncSession = Depends(get_db
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
 
-    # 3. Save each concept + embedding + review card
     for concept_data in concepts_data:
         embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
-        
+
         concept = Concept(
             id=uuid.uuid4(),
             document_id=document.id,
@@ -63,23 +62,67 @@ async def create_document(doc: DocumentCreate, db: AsyncSession = Depends(get_db
     return document
 
 
-@router.get("/documents/{document_id}/concepts", response_model=list[ConceptResponse])
-async def get_concepts(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    from sqlalchemy import select
-    result = await db.execute(
-        select(Concept).where(Concept.document_id == document_id)
-    )
-    concepts = result.scalars().all()
-    return concepts
+@router.post("/documents/upload-pdf", response_model=DocumentResponse)
+async def upload_pdf(
+    title: str = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload a PDF and extract concepts using Claude."""
 
-from sqlalchemy import func
-from app.models.review_card import ReviewCard
+    file_bytes = await file.read()
+    try:
+        content = extract_text_from_pdf(file_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="No text found in PDF")
+
+    document = Document(
+        id=uuid.uuid4(),
+        title=title,
+        content=content,
+        source_type="pdf"
+    )
+    db.add(document)
+    await db.flush()
+
+    try:
+        loop = asyncio.get_event_loop()
+        concepts_data = await loop.run_in_executor(None, extract_concepts, content[:3000])
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
+
+    for concept_data in concepts_data:
+        embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
+
+        concept = Concept(
+            id=uuid.uuid4(),
+            document_id=document.id,
+            title=concept_data["title"],
+            explanation=concept_data["explanation"],
+            embedding=embedding
+        )
+        db.add(concept)
+        await db.flush()
+
+        card = ReviewCard(
+            id=uuid.uuid4(),
+            concept_id=concept.id
+        )
+        db.add(card)
+
+    await db.commit()
+    await db.refresh(document)
+    return document
+
 
 @router.get("/documents", response_model=list[dict])
 async def get_documents(db: AsyncSession = Depends(get_db)):
     """Get all documents with concept counts."""
-    from sqlalchemy import select, func
-    
+
     result = await db.execute(
         select(
             Document.id,
@@ -92,7 +135,7 @@ async def get_documents(db: AsyncSession = Depends(get_db)):
         .group_by(Document.id)
         .order_by(Document.created_at.desc())
     )
-    
+
     rows = result.all()
     return [
         {
@@ -105,115 +148,65 @@ async def get_documents(db: AsyncSession = Depends(get_db)):
         for row in rows
     ]
 
+
+@router.get("/documents/{document_id}/concepts", response_model=list[ConceptResponse])
+async def get_concepts(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get all concepts extracted from a document."""
+
+    result = await db.execute(
+        select(Concept).where(Concept.document_id == document_id)
+    )
+    concepts = result.scalars().all()
+    return concepts
+
+
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Delete a document and all its concepts and review cards."""
-    from sqlalchemy import delete
+    from sqlalchemy import delete as sql_delete
 
-    # Delete review logs first
     concepts_result = await db.execute(
         select(Concept).where(Concept.document_id == document_id)
     )
     concepts = concepts_result.scalars().all()
+    concept_ids = [c.id for c in concepts]
 
-    for concept in concepts:
+    if concept_ids:
         cards_result = await db.execute(
-            select(ReviewCard).where(ReviewCard.concept_id == concept.id)
+            select(ReviewCard).where(ReviewCard.concept_id.in_(concept_ids))
         )
         cards = cards_result.scalars().all()
-        for card in cards:
+        card_ids = [c.id for c in cards]
+
+        if card_ids:
             await db.execute(
-                delete(ReviewLog).where(ReviewLog.review_card_id == card.id)
+                sql_delete(ReviewLog).where(ReviewLog.review_card_id.in_(card_ids))
             )
         await db.execute(
-            delete(ReviewCard).where(ReviewCard.concept_id == concept.id)
+            sql_delete(ReviewCard).where(ReviewCard.concept_id.in_(concept_ids))
+        )
+        await db.execute(
+            sql_delete(Concept).where(Concept.document_id == document_id)
         )
 
     await db.execute(
-        delete(Concept).where(Concept.document_id == document_id)
+        sql_delete(Document).where(Document.id == document_id)
     )
-    await db.execute(
-        delete(Document).where(Document.id == document_id)
-    )
-
     await db.commit()
-    return {"message": "Document deleted successfully"}
+    return {"message": "Deleted successfully"}
 
 
 @router.patch("/documents/{document_id}")
 async def update_document(document_id: uuid.UUID, data: dict, db: AsyncSession = Depends(get_db)):
     """Update a document title."""
-    result = await db.execute(select(Document).where(Document.id == document_id))
-    document = result.scalar_one_or_none()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    from sqlalchemy import update as sql_update
 
     if "title" in data:
-        document.title = data["title"]
-
-    await db.commit()
-    await db.refresh(document)
-    return {"message": "Document updated successfully"}
-    
-from fastapi import Form
-
-@router.post("/documents/upload-pdf", response_model=DocumentResponse)
-async def upload_pdf(
-    title: str = Form(...),
-    file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
-):
-    
-    """Upload a PDF and extract concepts using Claude."""
-
-    # Read and extract text from PDF
-    file_bytes = await file.read()
-    try:
-        content = extract_text_from_pdf(file_bytes)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
-
-    if not content:
-        raise HTTPException(status_code=400, detail="No text found in PDF")
-
-    # Save document
-    document = Document(
-        id=uuid.uuid4(),
-        title=title,
-        content=content,
-        source_type="pdf"
-    )
-    db.add(document)
-    await db.flush()
-
-    # Extract concepts with Claude
-    try:
-        loop = asyncio.get_event_loop()
-        concepts_data = await loop.run_in_executor(None, extract_concepts, content[:3000])
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
-
-    # Save concepts + embeddings + review cards
-    for concept_data in concepts_data:
-        embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
-        concept = Concept(
-            id=uuid.uuid4(),
-            document_id=document.id,
-            title=concept_data["title"],
-            explanation=concept_data["explanation"],
-            embedding=embedding
+        await db.execute(
+            sql_update(Document)
+            .where(Document.id == document_id)
+            .values(title=data["title"])
         )
-        db.add(concept)
-        await db.flush()
+        await db.commit()
 
-        card = ReviewCard(
-            id=uuid.uuid4(),
-            concept_id=concept.id
-        )
-        db.add(card)
-
-    await db.commit()
-    await db.refresh(document)
-    return document
+    return {"message": "Updated successfully"}
