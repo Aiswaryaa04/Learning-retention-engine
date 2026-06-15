@@ -10,7 +10,7 @@ class Concept(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
-    title = Column(String(500), nullable=False)   # e.g. "Python Decorators"
-    explanation = Column(Text, nullable=False)     # Claude's explanation
-    embedding = Column(Vector(384))               # semantic vector
+    title = Column(String(500), nullable=False)
+    explanation = Column(Text, nullable=False)
+    embedding = Column(Vector(384))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
