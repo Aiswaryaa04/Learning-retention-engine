@@ -9,6 +9,9 @@ from app.schemas.review import ReviewSubmit, ReviewCardResponse, ConceptWithCard
 from app.services.sm2_service import calculate_next_review
 from datetime import datetime, timezone
 import uuid
+from app.services.question_service import generate_question
+from app.services.rag_service import get_related_context
+import asyncio
 
 router = APIRouter()
 
@@ -81,3 +84,41 @@ async def submit_review(card_id: uuid.UUID, review: ReviewSubmit, db: AsyncSessi
     await db.commit()
     await db.refresh(card)
     return card
+
+@router.get("/reviews/{card_id}/question")
+async def get_question(card_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Generate an AI question for a review card using RAG."""
+    
+    # Get the card and its concept
+    result = await db.execute(
+        select(ReviewCard, Concept)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .where(ReviewCard.id == card_id)
+    )
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Card not found")
+    
+    card, concept = row
+
+    # RAG — find related context
+    related_context = await get_related_context(concept.id, db)
+    
+    # Generate question with Claude (run sync in thread)
+    loop = asyncio.get_event_loop()
+    question_data = await loop.run_in_executor(
+        None,
+        generate_question,
+        concept.title,
+        concept.explanation,
+        related_context
+    )
+    
+    return {
+        "card_id": card_id,
+        "concept_title": concept.title,
+        "question": question_data["question"],
+        "hint": question_data["hint"],
+        "answer": question_data["answer"]
+    }
