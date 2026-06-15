@@ -8,9 +8,7 @@ export default function History({ onReviewDocument }) {
   const [editTitle, setEditTitle] = useState('')
   const [deletingId, setDeletingId] = useState(null)
 
-  useEffect(() => {
-    fetchDocuments()
-  }, [])
+  useEffect(() => { fetchDocuments() }, [])
 
   const fetchDocuments = () => {
     setLoading(true)
@@ -31,11 +29,6 @@ export default function History({ onReviewDocument }) {
     setDeletingId(null)
   }
 
-  const handleEditStart = (doc) => {
-    setEditingId(doc.id)
-    setEditTitle(doc.title)
-  }
-
   const handleEditSave = async (docId) => {
     if (!editTitle.trim()) return
     try {
@@ -47,87 +40,89 @@ export default function History({ onReviewDocument }) {
     }
   }
 
-  const handleEditCancel = () => {
-    setEditingId(null)
-    setEditTitle('')
-  }
-
   if (loading) return (
-    <p style={{ color: '#666', textAlign: 'center', padding: 48 }}>Loading history...</p>
+    <div style={{ textAlign: 'center', padding: 60 }}>
+      <p style={{ color: '#6b7280' }}>Loading your library...</p>
+    </div>
   )
 
   if (documents.length === 0) return (
-    <div style={{ textAlign: 'center', padding: 48 }}>
-      <p style={{ fontSize: 48 }}>📚</p>
-      <h2 style={{ marginTop: 8 }}>No documents yet</h2>
-      <p style={{ color: '#666', marginTop: 8 }}>Upload some study material to get started.</p>
+    <div style={{ textAlign: 'center', padding: '60px 40px', background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb' }}>
+      <p style={{ fontSize: 48, marginBottom: 16 }}>📚</p>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Your library is empty</h2>
+      <p style={{ color: '#6b7280', fontSize: 15 }}>Upload some study material from the Dashboard to get started.</p>
     </div>
   )
 
   return (
-    <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>Study History</h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {documents.map(doc => (
-          <div key={doc.id} style={{
-            padding: 16,
-            border: '1px solid #e2e8f0',
-            borderRadius: 8,
-          }}>
-            {/* Title row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              {editingId === doc.id ? (
-                <input
-                  value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleEditSave(doc.id)}
-                  autoFocus
-                  style={{ flex: 1, padding: '6px 10px', border: '1px solid #000', borderRadius: 6, fontSize: 14, marginRight: 8 }}
-                />
-              ) : (
-                <p style={{ fontWeight: 600, fontSize: 15 }}>{doc.title}</p>
-              )}
-            </div>
-
-            {/* Meta */}
-            <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-              {doc.concept_count} concepts · {doc.source_type} · {new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-            </p>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {editingId === doc.id ? (
-                <>
-                  <button onClick={() => handleEditSave(doc.id)}
-                    style={{ padding: '6px 14px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                    Save
-                  </button>
-                  <button onClick={handleEditCancel}
-                    style={{ padding: '6px 14px', background: '#eee', color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => onReviewDocument(doc.id)}
-                    style={{ padding: '6px 14px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                    Review
-                  </button>
-                  <button onClick={() => handleEditStart(doc)}
-                    style={{ padding: '6px 14px', background: '#eee', color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                    Edit
-                  </button>
-                  <button onClick={() => handleDelete(doc.id)}
-                    disabled={deletingId === doc.id}
-                    style={{ padding: '6px 14px', background: '#fff', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-                    {deletingId === doc.id ? 'Deleting...' : 'Delete'}
-                  </button>
-                </>
-              )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {documents.map(doc => (
+        <div key={doc.id} style={{
+          background: '#fff',
+          borderRadius: 12,
+          border: '1px solid #e5e7eb',
+          padding: '20px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16
+        }}>
+          <div style={{ flex: 1 }}>
+            {editingId === doc.id ? (
+              <input
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleEditSave(doc.id)}
+                autoFocus
+                style={{ padding: '6px 10px', border: '1px solid #111827', borderRadius: 6, fontSize: 14, width: '100%', fontFamily: 'Inter, sans-serif', outline: 'none' }}
+              />
+            ) : (
+              <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{doc.title}</p>
+            )}
+            <div style={{ display: 'flex', gap: 12, marginTop: editingId === doc.id ? 8 : 0 }}>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                {doc.concept_count} concept{doc.concept_count !== 1 ? 's' : ''}
+              </span>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>•</span>
+              <span style={{ fontSize: 12, color: '#9ca3af', textTransform: 'capitalize' }}>{doc.source_type}</span>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>•</span>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                {new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
             </div>
           </div>
-        ))}
-      </div>
+
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {editingId === doc.id ? (
+              <>
+                <button onClick={() => handleEditSave(doc.id)}
+                  style={{ padding: '7px 14px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+                  Save
+                </button>
+                <button onClick={() => setEditingId(null)}
+                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => onReviewDocument(doc.id)}
+                  style={{ padding: '7px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+                  Review
+                </button>
+                <button onClick={() => { setEditingId(doc.id); setEditTitle(doc.title) }}
+                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  Edit
+                </button>
+                <button onClick={() => handleDelete(doc.id)} disabled={deletingId === doc.id}
+                  style={{ padding: '7px 14px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  {deletingId === doc.id ? '...' : 'Delete'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

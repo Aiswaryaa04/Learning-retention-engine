@@ -3,6 +3,60 @@ import { uploadDocument, uploadPDF, getDueReviews, getDueReviewsByDocument, getQ
 import History from './History'
 import './App.css'
 
+const Sidebar = ({ view, setView, startReview }) => (
+  <div style={{
+    width: 240,
+    minHeight: '100vh',
+    background: '#fff',
+    borderRight: '1px solid #e5e7eb',
+    padding: '24px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+  }}>
+    <div style={{ padding: '8px 12px', marginBottom: 24 }}>
+      <p style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>🧠 RetainAI</p>
+      <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Learning Retention Engine</p>
+    </div>
+
+    {[
+      { id: 'dashboard', icon: '⊞', label: 'Dashboard' },
+      { id: 'history', icon: '📚', label: 'My Library' },
+      { id: 'review', icon: '⚡', label: 'Review All' },
+    ].map(item => (
+      <button key={item.id}
+        onClick={() => item.id === 'review' ? startReview() : setView(item.id)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 12px',
+          background: view === item.id ? '#f3f4f6' : 'transparent',
+          border: 'none',
+          borderRadius: 8,
+          cursor: 'pointer',
+          textAlign: 'left',
+          fontSize: 14,
+          fontWeight: view === item.id ? 600 : 400,
+          color: view === item.id ? '#111827' : '#6b7280',
+          width: '100%',
+          transition: 'all 0.15s'
+        }}>
+        <span style={{ fontSize: 16 }}>{item.icon}</span>
+        {item.label}
+      </button>
+    ))}
+
+    <div style={{ marginTop: 'auto', padding: '12px', background: '#f9fafb', borderRadius: 8 }}>
+      <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Powered by</p>
+      <p style={{ fontSize: 12, fontWeight: 600, color: '#111827' }}>Claude AI + pgvector</p>
+    </div>
+  </div>
+)
+
 export default function App() {
   const [view, setView] = useState('dashboard')
   const [title, setTitle] = useState('')
@@ -25,6 +79,7 @@ export default function App() {
   const [brushup, setBrushup] = useState(null)
   const [loadingBrushup, setLoadingBrushup] = useState(false)
   const [showBrushup, setShowBrushup] = useState(false)
+  const [totalCards, setTotalCards] = useState(0)
 
   const handleUpload = async () => {
     if (!title || !content) return
@@ -63,9 +118,8 @@ export default function App() {
     setShowHint(false)
     const res = await getDueReviews()
     setDueCards(res.data)
-    if (res.data.length > 0) {
-      loadQuestion(res.data[0].card_id)
-    }
+    setTotalCards(res.data.length)
+    if (res.data.length > 0) loadQuestion(res.data[0].card_id)
   }
 
   const startDocumentReview = async (documentId) => {
@@ -77,9 +131,8 @@ export default function App() {
     setShowHint(false)
     const res = await getDueReviewsByDocument(documentId)
     setDueCards(res.data)
-    if (res.data.length > 0) {
-      loadQuestion(res.data[0].card_id)
-    }
+    setTotalCards(res.data.length)
+    if (res.data.length > 0) loadQuestion(res.data[0].card_id)
   }
 
   const loadQuestion = async (cardId) => {
@@ -141,254 +194,352 @@ export default function App() {
     }
   }
 
-  const feedbackColor = {
-    full: { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', label: '✓ Great answer!' },
-    partial: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', label: '~ Partially correct' },
-    incorrect: { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', label: '✗ Not quite' }
+  const feedbackStyles = {
+    full: { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534', label: '✓ Great answer!' },
+    partial: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', label: '◑ Partially correct' },
+    incorrect: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b', label: '✗ Not quite right' }
   }
 
+  const progress = totalCards > 0 ? ((totalCards - dueCards.length) / totalCards) * 100 : 0
+
   return (
-    <div style={{ maxWidth: 700, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
-        Learning Retention Engine
-      </h1>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar view={view} setView={setView} startReview={startReview} />
 
-      {/* Nav */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 32, justifyContent: 'center' }}>
-        <button onClick={() => setView('dashboard')}
-          style={{ padding: '8px 16px', background: view === 'dashboard' ? '#000' : '#eee', color: view === 'dashboard' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-          Dashboard
-        </button>
-        <button onClick={() => setView('history')}
-          style={{ padding: '8px 16px', background: view === 'history' ? '#000' : '#eee', color: view === 'history' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-          History
-        </button>
-        <button onClick={startReview}
-          style={{ padding: '8px 16px', background: view === 'review' ? '#000' : '#eee', color: view === 'review' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-          Review All
-        </button>
-      </div>
+      {/* Main content */}
+      <div style={{ marginLeft: 240, flex: 1, padding: '40px 48px', maxWidth: 900 }}>
 
-      {/* Dashboard */}
-      {view === 'dashboard' && (
-        <div>
-          <h2 style={{ fontSize: 18, marginBottom: 16 }}>Add Study Material</h2>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            <button onClick={() => setUploadMode('text')}
-              style={{ padding: '6px 16px', background: uploadMode === 'text' ? '#000' : '#eee', color: uploadMode === 'text' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-              Paste Text
-            </button>
-            <button onClick={() => setUploadMode('pdf')}
-              style={{ padding: '6px 16px', background: uploadMode === 'pdf' ? '#000' : '#eee', color: uploadMode === 'pdf' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-              Upload PDF
-            </button>
-          </div>
+        {/* Dashboard */}
+        {view === 'dashboard' && (
+          <div>
+            <div style={{ marginBottom: 32 }}>
+              <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>Dashboard</h1>
+              <p style={{ color: '#6b7280', fontSize: 15 }}>Add study material and let AI extract what matters.</p>
+            </div>
 
-          <input
-            placeholder="Title (e.g. Python Decorators)"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            style={{ width: '100%', padding: 10, marginBottom: 12, border: '1px solid #ddd', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }}
-          />
+            {/* Upload card */}
+            <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 32, maxWidth: 640 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Add Study Material</h2>
 
-          {uploadMode === 'text' ? (
-            <>
-              <textarea
-                placeholder="Paste your notes, article, or any text here..."
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                rows={8}
-                style={{ width: '100%', padding: 10, marginBottom: 12, border: '1px solid #ddd', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }}
+              {/* Toggle */}
+              <div style={{ display: 'flex', gap: 0, marginBottom: 20, background: '#f3f4f6', borderRadius: 8, padding: 4, width: 'fit-content' }}>
+                {['text', 'pdf'].map(mode => (
+                  <button key={mode} onClick={() => setUploadMode(mode)}
+                    style={{
+                      padding: '6px 20px',
+                      background: uploadMode === mode ? '#fff' : 'transparent',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 13,
+                      fontWeight: uploadMode === mode ? 600 : 400,
+                      color: uploadMode === mode ? '#111827' : '#6b7280',
+                      boxShadow: uploadMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.15s'
+                    }}>
+                    {mode === 'text' ? 'Paste Text' : 'Upload PDF'}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                placeholder="Give this material a title..."
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px 14px', marginBottom: 12,
+                  border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14,
+                  boxSizing: 'border-box', outline: 'none', fontFamily: 'Inter, sans-serif'
+                }}
               />
-              <button onClick={handleUpload} disabled={uploading}
-                style={{ padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>
-                {uploading ? 'Extracting concepts...' : 'Upload & Extract Concepts'}
-              </button>
-            </>
-          ) : (
-            <>
-              <div
-                onClick={() => document.getElementById('pdf-input').click()}
-                style={{ border: '2px dashed #ddd', borderRadius: 8, padding: 40, textAlign: 'center', cursor: 'pointer', marginBottom: 12, background: pdfFile ? '#f0fdf4' : '#fafafa' }}>
-                <p style={{ fontSize: 32, marginBottom: 8 }}>📄</p>
-                <p style={{ fontSize: 14, color: '#666' }}>
-                  {pdfFile ? pdfFile.name : 'Click to select a PDF file'}
-                </p>
-                <input id="pdf-input" type="file" accept=".pdf" style={{ display: 'none' }}
-                  onChange={e => setPdfFile(e.target.files[0])} />
-              </div>
-              <button onClick={handlePdfUpload} disabled={uploadingPdf || !pdfFile}
-                style={{ padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, opacity: !pdfFile ? 0.5 : 1 }}>
-                {uploadingPdf ? 'Processing PDF...' : 'Upload PDF & Extract Concepts'}
-              </button>
-            </>
-          )}
 
-          {uploadResult && (
-            <div style={{ marginTop: 24, padding: 16, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
-              <p style={{ fontWeight: 600, color: '#16a34a' }}>✓ Concepts extracted successfully!</p>
-              <p style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Click Review to start studying.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* History */}
-      {view === 'history' && (
-        <History onReviewDocument={(docId) => startDocumentReview(docId)} />
-      )}
-
-      {/* Review */}
-      {view === 'review' && (
-        <div>
-          {reviewDone && (
-            <div style={{ textAlign: 'center', padding: 48 }}>
-              <p style={{ fontSize: 48 }}>🎉</p>
-              <h2 style={{ fontSize: 22, fontWeight: 700 }}>All done for today!</h2>
-              <p style={{ color: '#666', marginTop: 8 }}>Come back tomorrow for your next review session.</p>
-              <button onClick={() => setView('dashboard')}
-                style={{ marginTop: 16, padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                Back to Dashboard
-              </button>
-            </div>
-          )}
-
-          {!reviewDone && loadingQuestion && (
-            <p style={{ color: '#666', textAlign: 'center', padding: 48 }}>Generating question...</p>
-          )}
-
-          {!reviewDone && !loadingQuestion && currentQuestion && (
-            <div>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-                {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} remaining
-              </p>
-
-              {/* Question */}
-              <div style={{ padding: 20, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 16 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  {currentQuestion.concept_title}
-                </p>
-                <p style={{ fontSize: 16, lineHeight: 1.7 }}>{currentQuestion.question}</p>
-              </div>
-
-              {/* Answer input — shown before evaluation */}
-              {!feedback && !showAnswer && (
-                <div>
+              {uploadMode === 'text' ? (
+                <>
                   <textarea
-                    placeholder="Type your answer here before seeing the correct one..."
-                    value={userAnswer}
-                    onChange={e => setUserAnswer(e.target.value)}
-                    rows={4}
-                    style={{ width: '100%', padding: 10, marginBottom: 12, border: '1px solid #ddd', borderRadius: 6, fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }}
+                    placeholder="Paste your notes, article, book chapter, or any text..."
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    rows={8}
+                    style={{
+                      width: '100%', padding: '10px 14px', marginBottom: 16,
+                      border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14,
+                      boxSizing: 'border-box', resize: 'vertical', fontFamily: 'Inter, sans-serif',
+                      outline: 'none', lineHeight: 1.6
+                    }}
                   />
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                    <button onClick={handleEvaluate} disabled={evaluating || !userAnswer.trim()}
-                      style={{ padding: '10px 20px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', opacity: !userAnswer.trim() ? 0.5 : 1 }}>
-                      {evaluating ? 'Evaluating...' : 'Submit Answer'}
-                    </button>
-                    <button onClick={() => setShowAnswer(true)}
-                      style={{ padding: '10px 20px', background: '#eee', color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                      Skip — Show Answer
-                    </button>
-                    {!showHint && (
-                      <button onClick={() => setShowHint(true)}
-                        style={{ padding: '10px 20px', background: '#eee', color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                        Hint
+                  <button onClick={handleUpload} disabled={uploading || !title || !content}
+                    style={{
+                      padding: '10px 24px', background: '#111827', color: '#fff',
+                      border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+                      fontWeight: 500, opacity: (!title || !content) ? 0.5 : 1,
+                      fontFamily: 'Inter, sans-serif'
+                    }}>
+                    {uploading ? '⏳ Extracting concepts...' : '✦ Extract Concepts with AI'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div onClick={() => document.getElementById('pdf-input').click()}
+                    style={{
+                      border: `2px dashed ${pdfFile ? '#86efac' : '#e5e7eb'}`,
+                      borderRadius: 10, padding: '36px 24px', textAlign: 'center',
+                      cursor: 'pointer', marginBottom: 16,
+                      background: pdfFile ? '#f0fdf4' : '#fafafa',
+                      transition: 'all 0.2s'
+                    }}>
+                    <p style={{ fontSize: 28, marginBottom: 8 }}>{pdfFile ? '✅' : '📄'}</p>
+                    <p style={{ fontSize: 14, color: pdfFile ? '#16a34a' : '#6b7280', fontWeight: pdfFile ? 500 : 400 }}>
+                      {pdfFile ? pdfFile.name : 'Click to select a PDF file'}
+                    </p>
+                    {!pdfFile && <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>Supports any PDF document</p>}
+                    <input id="pdf-input" type="file" accept=".pdf" style={{ display: 'none' }}
+                      onChange={e => setPdfFile(e.target.files[0])} />
+                  </div>
+                  <button onClick={handlePdfUpload} disabled={uploadingPdf || !pdfFile || !title}
+                    style={{
+                      padding: '10px 24px', background: '#111827', color: '#fff',
+                      border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+                      fontWeight: 500, opacity: (!pdfFile || !title) ? 0.5 : 1,
+                      fontFamily: 'Inter, sans-serif'
+                    }}>
+                    {uploadingPdf ? '⏳ Processing PDF...' : '✦ Upload PDF & Extract Concepts'}
+                  </button>
+                </>
+              )}
+
+              {uploadResult && (
+                <div style={{ marginTop: 20, padding: '14px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>✓</span>
+                  <div>
+                    <p style={{ fontWeight: 600, color: '#16a34a', fontSize: 14 }}>Concepts extracted successfully!</p>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Head to My Library or click Review All to start studying.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick stats */}
+            <div style={{ display: 'flex', gap: 16, marginTop: 32, maxWidth: 640 }}>
+              {[
+                { label: 'How it works', icon: '1', text: 'Upload any study material' },
+                { label: 'How it works', icon: '2', text: 'AI extracts key concepts' },
+                { label: 'How it works', icon: '3', text: 'Review at the right time' },
+              ].map((item, i) => (
+                <div key={i} style={{ flex: 1, padding: 16, background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb' }}>
+                  <div style={{ width: 28, height: 28, background: '#111827', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{item.icon}</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.5 }}>{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* History */}
+        {view === 'history' && (
+          <div>
+            <div style={{ marginBottom: 32 }}>
+              <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>My Library</h1>
+              <p style={{ color: '#6b7280', fontSize: 15 }}>All your study materials in one place.</p>
+            </div>
+            <History onReviewDocument={(docId) => startDocumentReview(docId)} />
+          </div>
+        )}
+
+        {/* Review */}
+        {view === 'review' && (
+          <div style={{ maxWidth: 640 }}>
+            <div style={{ marginBottom: 28 }}>
+              <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>Review Session</h1>
+              {totalCards > 0 && !reviewDone && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <p style={{ fontSize: 13, color: '#6b7280' }}>{totalCards - dueCards.length} of {totalCards} completed</p>
+                    <p style={{ fontSize: 13, color: '#6b7280' }}>{Math.round(progress)}%</p>
+                  </div>
+                  <div style={{ height: 6, background: '#e5e7eb', borderRadius: 99 }}>
+                    <div style={{ height: '100%', width: `${progress}%`, background: '#111827', borderRadius: 99, transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {reviewDone && (
+              <div style={{ textAlign: 'center', padding: '60px 40px', background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb' }}>
+                <p style={{ fontSize: 56, marginBottom: 16 }}>🎉</p>
+                <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Session Complete!</h2>
+                <p style={{ color: '#6b7280', fontSize: 15, marginBottom: 28 }}>You reviewed {totalCards} concept{totalCards !== 1 ? 's' : ''}. Come back tomorrow for your next session.</p>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  <button onClick={() => setView('dashboard')}
+                    style={{ padding: '10px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+                    Back to Dashboard
+                  </button>
+                  <button onClick={() => setView('history')}
+                    style={{ padding: '10px 24px', background: '#fff', color: '#111827', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}>
+                    View Library
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!reviewDone && loadingQuestion && (
+              <div style={{ textAlign: 'center', padding: '60px 40px', background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb' }}>
+                <p style={{ fontSize: 32, marginBottom: 12 }}>⚡</p>
+                <p style={{ color: '#6b7280', fontSize: 15 }}>Generating your question...</p>
+              </div>
+            )}
+
+            {!reviewDone && !loadingQuestion && currentQuestion && (
+              <div>
+                {/* Question card */}
+                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 28, marginBottom: 16 }}>
+                  <span style={{ display: 'inline-block', padding: '3px 10px', background: '#f3f4f6', borderRadius: 99, fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 14, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                    {currentQuestion.concept_title}
+                  </span>
+                  <p style={{ fontSize: 16, lineHeight: 1.75, color: '#111827' }}>{currentQuestion.question}</p>
+                </div>
+
+                {/* Answer input */}
+                {!feedback && !showAnswer && (
+                  <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Your Answer</p>
+                    <textarea
+                      placeholder="Type your answer here before seeing the correct one..."
+                      value={userAnswer}
+                      onChange={e => setUserAnswer(e.target.value)}
+                      rows={4}
+                      style={{
+                        width: '100%', padding: '10px 14px', marginBottom: 14,
+                        border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14,
+                        boxSizing: 'border-box', resize: 'vertical',
+                        fontFamily: 'Inter, sans-serif', outline: 'none', lineHeight: 1.6
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={handleEvaluate} disabled={evaluating || !userAnswer.trim()}
+                        style={{
+                          padding: '9px 20px', background: '#111827', color: '#fff',
+                          border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                          fontWeight: 500, opacity: !userAnswer.trim() ? 0.4 : 1
+                        }}>
+                        {evaluating ? 'Evaluating...' : 'Submit Answer'}
                       </button>
+                      <button onClick={() => setShowAnswer(true)}
+                        style={{ padding: '9px 20px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                        Skip — Show Answer
+                      </button>
+                      {!showHint && (
+                        <button onClick={() => setShowHint(true)}
+                          style={{ padding: '9px 20px', background: '#fff', color: '#6b7280', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                          💡 Hint
+                        </button>
+                      )}
+                    </div>
+
+                    {showHint && (
+                      <div style={{ marginTop: 14, padding: '12px 16px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>HINT</p>
+                        <p style={{ fontSize: 13, lineHeight: 1.6, color: '#78350f' }}>{currentQuestion.hint}</p>
+                      </div>
                     )}
                   </div>
+                )}
 
-                  {/* Hint */}
-                  {showHint && (
-                    <div style={{ padding: 16, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginTop: 8 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>HINT</p>
-                      <p style={{ fontSize: 14, lineHeight: 1.6 }}>{currentQuestion.hint}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* AI Feedback on user's answer */}
-              {feedback && (
-                <div style={{ padding: 16, background: feedbackColor[feedback.score].bg, borderRadius: 8, border: `1px solid ${feedbackColor[feedback.score].border}`, marginBottom: 12 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: feedbackColor[feedback.score].text, marginBottom: 8 }}>
-                    {feedbackColor[feedback.score].label}
-                  </p>
-                  <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>{feedback.feedback}</p>
-                  <p style={{ fontSize: 13, color: '#555', fontStyle: 'italic' }}>💡 {feedback.tip}</p>
-                </div>
-              )}
-
-              {/* Correct answer */}
-              {showAnswer && (
-                <div>
-                  {!feedback && (
-                    <div style={{ padding: 16, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 12 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>HINT</p>
-                      <p style={{ fontSize: 14, lineHeight: 1.6 }}>{currentQuestion.hint}</p>
-                    </div>
-                  )}
-                  <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', marginBottom: 16 }}>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#166534', marginBottom: 8 }}>CORRECT ANSWER</p>
-                    <p style={{ fontSize: 14, lineHeight: 1.7 }}>{currentQuestion.answer}</p>
+                {/* AI Feedback */}
+                {feedback && (
+                  <div style={{
+                    padding: '16px 20px',
+                    background: feedbackStyles[feedback.score].bg,
+                    borderRadius: 10,
+                    border: `1px solid ${feedbackStyles[feedback.score].border}`,
+                    marginBottom: 16
+                  }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: feedbackStyles[feedback.score].color, marginBottom: 8 }}>
+                      {feedbackStyles[feedback.score].label}
+                    </p>
+                    <p style={{ fontSize: 14, lineHeight: 1.65, marginBottom: 10 }}>{feedback.feedback}</p>
+                    <p style={{ fontSize: 13, color: '#555', fontStyle: 'italic' }}>💡 {feedback.tip}</p>
                   </div>
+                )}
 
-                  {/* Brush up button */}
-                  <button onClick={handleBrushup}
-                    style={{ padding: '8px 16px', background: '#fff', color: '#6366f1', border: '1px solid #6366f1', borderRadius: 6, cursor: 'pointer', fontSize: 13, marginBottom: 16 }}>
-                    🔍 Deep dive into this concept
-                  </button>
-
-                  {/* Brushup popover */}
-                  {showBrushup && (
-                    <div style={{ padding: 16, background: '#f5f3ff', borderRadius: 8, border: '1px solid #ddd6fe', marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <p style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', textTransform: 'uppercase' }}>Deep Dive</p>
-                        <button onClick={() => setShowBrushup(false)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: 16 }}>✕</button>
+                {/* Correct answer */}
+                {showAnswer && (
+                  <div>
+                    {!feedback && (
+                      <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 12 }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 6 }}>HINT</p>
+                        <p style={{ fontSize: 13, lineHeight: 1.6 }}>{currentQuestion.hint}</p>
                       </div>
-                      {loadingBrushup
-                        ? <p style={{ fontSize: 14, color: '#666' }}>Loading explanation...</p>
-                        : <p style={{ fontSize: 14, lineHeight: 1.7 }}>{brushup}</p>
-                      }
+                    )}
+                    <div style={{ padding: '16px 20px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', marginBottom: 16 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: '#166534', marginBottom: 8 }}>CORRECT ANSWER</p>
+                      <p style={{ fontSize: 14, lineHeight: 1.7 }}>{currentQuestion.answer}</p>
                     </div>
-                  )}
 
-                  {/* Grading */}
-                  <p style={{ fontWeight: 600, marginBottom: 12 }}>How well did you know this?</p>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {[
-                      { q: 0, label: 'Forgot', color: '#ef4444' },
-                      { q: 2, label: 'Hard', color: '#f97316' },
-                      { q: 4, label: 'Good', color: '#22c55e' },
-                      { q: 5, label: 'Easy', color: '#3b82f6' },
-                    ].map(({ q, label, color }) => (
-                      <button key={q} onClick={() => handleGrade(q)}
-                        style={{ flex: 1, padding: '10px 0', background: color, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}>
-                        {label}
-                      </button>
-                    ))}
+                    {/* Deep dive */}
+                    <button onClick={handleBrushup}
+                      style={{ padding: '8px 16px', background: '#fff', color: '#6366f1', border: '1px solid #c7d2fe', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, marginBottom: 16 }}>
+                      🔍 Deep dive into this concept
+                    </button>
+
+                    {showBrushup && (
+                      <div style={{ padding: '16px 20px', background: '#f5f3ff', borderRadius: 10, border: '1px solid #ddd6fe', marginBottom: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: '#6366f1', textTransform: 'uppercase', letterSpacing: 0.5 }}>Deep Dive</p>
+                          <button onClick={() => setShowBrushup(false)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 18, lineHeight: 1 }}>×</button>
+                        </div>
+                        {loadingBrushup
+                          ? <p style={{ fontSize: 14, color: '#6b7280' }}>Loading explanation...</p>
+                          : <p style={{ fontSize: 14, lineHeight: 1.75, color: '#374151' }}>{brushup}</p>
+                        }
+                      </div>
+                    )}
+
+                    {/* Grading */}
+                    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 14 }}>How well did you know this?</p>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[
+                          { q: 0, label: 'Forgot', color: '#ef4444' },
+                          { q: 2, label: 'Hard', color: '#f97316' },
+                          { q: 4, label: 'Good', color: '#22c55e' },
+                          { q: 5, label: 'Easy', color: '#3b82f6' },
+                        ].map(({ q, label, color }) => (
+                          <button key={q} onClick={() => handleGrade(q)}
+                            style={{
+                              flex: 1, padding: '10px 0', background: color,
+                              color: '#fff', border: 'none', borderRadius: 8,
+                              cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                              fontFamily: 'Inter, sans-serif'
+                            }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
-          {!reviewDone && !loadingQuestion && dueCards.length === 0 && !currentQuestion && (
-            <div style={{ textAlign: 'center', padding: 48 }}>
-              <p style={{ fontSize: 48 }}>✅</p>
-              <h2 style={{ marginTop: 8 }}>No reviews due!</h2>
-              <p style={{ color: '#666', marginTop: 8 }}>
-                {reviewingDocumentId ? 'No cards due for this document.' : 'Upload some study material to get started.'}
-              </p>
-              <button onClick={() => setView('history')}
-                style={{ marginTop: 16, padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
-                Back to History
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            {!reviewDone && !loadingQuestion && dueCards.length === 0 && !currentQuestion && (
+              <div style={{ textAlign: 'center', padding: '60px 40px', background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb' }}>
+                <p style={{ fontSize: 48, marginBottom: 16 }}>✅</p>
+                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>You're all caught up!</h2>
+                <p style={{ color: '#6b7280', fontSize: 15, marginBottom: 24 }}>
+                  {reviewingDocumentId ? 'No cards due for this topic right now.' : 'No reviews due. Add more material or check back later.'}
+                </p>
+                <button onClick={() => setView('dashboard')}
+                  style={{ padding: '10px 24px', background: '#111827', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+                  Add More Material
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
