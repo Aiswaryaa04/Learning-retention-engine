@@ -1,50 +1,58 @@
-# 🧠 Learning Retention Engine
+# Retention
 
-**Live Demo → [learning-retention-engine.vercel.app](https://learning-retention-engine.vercel.app)**
+> AI-powered spaced repetition learning — built from scratch.
+
+**Live → [learning-retention-engine.vercel.app](https://learning-retention-engine.vercel.app)**
 
 ---
 
 ## The Problem
 
-You read an article. You watch a lecture. You take notes. A week later — it's gone.
+Most people study wrong.
 
-The traditional way to study is passive: read, highlight, maybe re-read. Research consistently shows this doesn't work. Information decays rapidly after you first encounter it, following what psychologists call the **forgetting curve**. Within a week, most people forget 70% of what they read.
+They re-read notes, highlight textbooks, watch lectures — then forget 70% of it within a week. This isn't laziness. It's biology. Our brains discard information that isn't reinforced at the right time.
 
-The solution isn't to study more. It's to study at the right time, and to study actively.
+Two techniques are proven to fix this:
 
-**Active recall** — forcing yourself to retrieve information — is 2-3x more effective than re-reading. **Spaced repetition** — reviewing material right before you forget it — makes retention exponential rather than linear.
+**Active recall** — forcing yourself to retrieve information from memory, rather than passively re-reading it. Studies show this is 2-3x more effective for long-term retention.
 
-The problem is that both require significant manual effort: creating flashcards, scheduling reviews, tracking what you know. Most people don't do it, not because they don't want to, but because the friction is too high.
+**Spaced repetition** — reviewing material at increasing intervals, right before you'd forget it. Instead of cramming everything the night before, you review a concept once today, again in 3 days, then in 2 weeks, then in a month.
+
+The problem is that doing both manually is too much friction. You have to create flashcards, schedule reviews, track what you know vs what you're forgetting. Most people don't bother.
+
+**Retention removes that friction entirely.**
 
 ---
 
-## What I Built
+## What It Does
 
-A full-stack AI application that removes all that friction.
+Upload any study material — notes, a PDF, a book chapter, anything. Retention reads it, extracts the key concepts automatically, and builds a review schedule tailored to your performance.
 
-You paste any text or upload any PDF. The app does the rest — extracting what matters, quizzing you on it, and bringing it back at exactly the right time before you forget it.
+When it's time to review, it doesn't just show you a flashcard. It generates a question grounded in your specific material, makes you write an answer, evaluates what you got right and wrong, and schedules the next review based on how well you did.
+
+Come back the next day — only the concepts you're about to forget are waiting for you.
 
 ---
 
 ## How It Works
 
-### 1. Intelligent Concept Extraction
-Upload any study material — lecture notes, a research paper, a book chapter, anything. Claude AI reads it and extracts the 3-8 most important concepts, each with a clear explanation. No manual flashcard creation.
+### Step 1 — Upload
+Paste text or upload a PDF. Claude AI reads the content and extracts 3-8 key concepts with clear explanations. No manual flashcard creation.
 
-### 2. Vector Embeddings for Semantic Understanding
-Each concept is converted into a 384-dimensional vector embedding and stored in PostgreSQL using the pgvector extension. This allows the app to understand *meaning*, not just keywords — finding related concepts even when the wording is different.
+### Step 2 — Study (optional)
+Before the quiz starts, browse all extracted concepts one by one. Read, understand, then move to the quiz when ready.
 
-### 3. RAG-Powered Question Generation
-When it's time to review, the app doesn't just ask generic questions. It uses **Retrieval Augmented Generation (RAG)** — finding the most semantically similar concepts from your library using cosine similarity search, then sending that context to Claude to generate questions grounded in *your actual material*.
+### Step 3 — Active Recall
+For each concept, a question is generated — not from Claude's general knowledge, but from your specific material using a RAG pipeline. You type your answer before seeing the correct one.
 
-### 4. Active Recall with AI Feedback
-You type your answer before seeing the correct one. Claude then evaluates your specific response — telling you exactly what you got right, what you missed, and giving you a memorable tip to retain the concept. This is fundamentally different from passive flashcard review.
+### Step 4 — AI Feedback
+Claude reads your answer and tells you exactly what you got right, what you missed, and gives you a memorable tip. This is meaningfully different from flipping a flashcard and deciding "yeah I knew that."
 
-### 5. SM-2 Spaced Repetition Scheduling
-After each review, the SM-2 algorithm (the same algorithm Anki uses) calculates when you should see this concept again. Answer perfectly — you won't see it for weeks. Struggle — it comes back tomorrow. The schedule adapts to your performance on every individual concept.
+### Step 5 — Scheduling
+You grade yourself (Forgot / Hard / Good / Easy). The SM-2 algorithm calculates when you should see this concept again — tomorrow if you struggled, weeks later if you aced it.
 
-### 6. Forgetting Risk Dashboard
-The dashboard shows which concepts are at risk of being forgotten, color-coded by urgency — before you've actually forgotten them. This is the proactive layer that keeps your retention from slipping between sessions.
+### Step 6 — Forgetting Risk
+The dashboard shows which concepts are at risk of being forgotten before you've actually forgotten them. Red means review now. Green means you're safe.
 
 ---
 
@@ -60,54 +68,60 @@ PostgreSQL          Claude API
 (Supabase)
 ```
 
-| Layer | Technology | Decision |
-|---|---|---|
-| Frontend | React + Vite | Component-based, fast dev server |
-| Backend | FastAPI (Python) | Async-native, auto-generates API docs |
-| Database | PostgreSQL + pgvector | Vector similarity search alongside relational data |
-| Embeddings | Custom hash-based embedder | Eliminated memory constraints of ML models on free hosting |
-| LLM | Claude claude-sonnet-4-6 | Concept extraction, question generation, answer evaluation |
-| Algorithm | SM-2 | Battle-tested, adapts per-card based on performance history |
-| Containerization | Docker | Reproducible builds, one-command local setup |
+### The RAG Pipeline
 
----
+Standard AI flashcard apps generate questions using Claude's general training data. Retention does something different.
 
-## Key Technical Decisions
+When it's time to quiz you on a concept, it:
+1. Takes that concept's vector embedding
+2. Searches the database for the 3 most semantically similar concepts using cosine similarity
+3. Sends those related concepts as context to Claude
+4. Claude generates a question grounded in *your actual study material*
 
-**Why RAG instead of just prompting Claude directly?**
-Without RAG, Claude generates questions from its general training data. With RAG, it generates questions based on the specific content the user uploaded — the exact examples, analogies, and explanations they studied. This makes every question relevant and grounded.
+The result is questions that are specific to what you studied — not generic questions about the topic.
 
-**Why pgvector over a dedicated vector database like Pinecone?**
-Keeping everything in one PostgreSQL database reduces infrastructure complexity significantly. pgvector gives vector similarity search alongside relational data without managing a separate service — the right tradeoff for this scale.
+### The SM-2 Algorithm
 
-**Why SM-2 over a simpler scheduling algorithm?**
-SM-2 adapts per-card based on individual performance history. A fixed interval schedule would waste time on concepts the user already knows well. SM-2 is also the algorithm behind Anki — used by millions of students for decades — which validates the approach.
+After each review, three values update per concept:
 
-**Why active recall over traditional flashcards?**
-Cognitive science research consistently shows that retrieving information (active recall) is significantly more effective for long-term retention than passively re-reading or flipping flashcards. Making users write their answer before seeing the correct one forces genuine retrieval, not recognition.
+- `interval` — days until next review
+- `easiness_factor` — how easy this card is (min 1.3, default 2.5)
+- `repetitions` — successful review streak
 
----
-
-## Features
-
-- Upload text or PDF — AI extracts key concepts automatically
-- RAG-powered quiz questions grounded in your study material
-- Write your answer before seeing the correct one
-- Claude evaluates your answer and gives specific, personalized feedback
-- SM-2 algorithm schedules reviews at the optimal time
-- Forgetting risk dashboard — know what you're about to forget before you forget it
-- Deep dive explanations for any concept on demand
-- Study history — manage all uploaded material with edit and delete
-- Review by specific topic or review everything due today
+Score below 3 (forgot it) → interval resets to 1 day. Score 3-5 → interval multiplies by easiness factor. Over time, concepts you know well disappear for weeks. Concepts you struggle with come back daily.
 
 ---
 
 ## Stack
 
-`Python` `FastAPI` `React` `PostgreSQL` `pgvector` `Docker` `Claude AI` `Supabase` `Vercel` `Render`
+| Layer | Technology |
+|---|---|
+| Frontend | React + Vite |
+| Backend | FastAPI (Python) |
+| Database | PostgreSQL + pgvector |
+| LLM | Claude claude-sonnet-4-6 (Anthropic) |
+| Algorithm | SM-2 Spaced Repetition |
+| Hosting | Vercel + Render + Supabase |
+| Container | Docker |
 
 ---
 
-**Live Demo → [learning-retention-engine.vercel.app](https://learning-retention-engine.vercel.app)**
+## Key Decisions
 
-*Built by Aiswaryaa — [GitHub](https://github.com/Aiswaryaa04/Learning-retention-engine)*
+**pgvector over Pinecone**
+Keeping vector search inside PostgreSQL eliminates a separate service. The tradeoff is slightly less performance at massive scale — acceptable for this use case.
+
+**SM-2 over a custom algorithm**
+SM-2 is battle-tested with millions of Anki users over decades. Building a custom algorithm would require significant training data to validate. SM-2 works.
+
+**Active recall over passive flashcards**
+Making users write an answer before seeing the correct one forces genuine memory retrieval. Most flashcard apps let you peek at the answer and convince yourself you knew it. Retention doesn't.
+
+**Claude for answer evaluation**
+A simple string comparison can't evaluate whether an answer is conceptually correct. Claude reads the user's response and gives specific, contextual feedback — this is the feature that makes the learning actually work.
+
+---
+
+**Live → [learning-retention-engine.vercel.app](https://learning-retention-engine.vercel.app)**
+
+*GitHub → [Aiswaryaa04/Learning-retention-engine](https://github.com/Aiswaryaa04/Learning-retention-engine)*
