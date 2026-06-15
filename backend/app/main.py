@@ -4,6 +4,7 @@ from sqlalchemy import text
 from app.db.base import Base
 from app.db.session import engine
 from app.api.routes.documents import router as documents_router
+from app.api.routes.reviews import router as reviews_router
 
 app = FastAPI(title="Learning Retention Engine", version="1.0.0")
 
@@ -22,6 +23,7 @@ async def startup():
         await conn.run_sync(Base.metadata.create_all)
 
 app.include_router(documents_router, prefix="/api/v1", tags=["documents"])
+app.include_router(reviews_router, prefix="/api/v1", tags=["reviews"])
 
 @app.get("/health")
 async def health():
