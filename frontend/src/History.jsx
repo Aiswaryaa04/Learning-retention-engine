@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDocuments, deleteDocument, updateDocument } from './api'
 
-export default function History({ onReviewDocument }) {
+export default function History({ onReviewDocument, onStudyDocument }) {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -74,7 +74,11 @@ export default function History({ onReviewDocument }) {
                 onChange={e => setEditTitle(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleEditSave(doc.id)}
                 autoFocus
-                style={{ padding: '6px 10px', border: '1px solid #111827', borderRadius: 6, fontSize: 14, width: '100%', fontFamily: 'Inter, sans-serif', outline: 'none' }}
+                style={{
+                  padding: '6px 10px', border: '1px solid #111827',
+                  borderRadius: 6, fontSize: 14, width: '100%',
+                  fontFamily: 'Inter, sans-serif', outline: 'none'
+                }}
               />
             ) : (
               <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{doc.title}</p>
@@ -96,26 +100,30 @@ export default function History({ onReviewDocument }) {
             {editingId === doc.id ? (
               <>
                 <button onClick={() => handleEditSave(doc.id)}
-                  style={{ padding: '7px 14px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+                  style={{ padding: '7px 14px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                   Save
                 </button>
                 <button onClick={() => setEditingId(null)}
-                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>
                   Cancel
                 </button>
               </>
             ) : (
               <>
                 <button onClick={() => onReviewDocument(doc.id)}
-                  style={{ padding: '7px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
-                  Review
+                  style={{ padding: '7px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
+                  ⚡ Review
+                </button>
+                <button onClick={() => onStudyDocument(doc.id)}
+                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>
+                  📖 Study
                 </button>
                 <button onClick={() => { setEditingId(doc.id); setEditTitle(doc.title) }}
-                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  style={{ padding: '7px 14px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>
                   Edit
                 </button>
                 <button onClick={() => handleDelete(doc.id)} disabled={deletingId === doc.id}
-                  style={{ padding: '7px 14px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  style={{ padding: '7px 14px', background: '#fff', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 7, cursor: 'pointer', fontSize: 13, fontFamily: 'Inter, sans-serif' }}>
                   {deletingId === doc.id ? '...' : 'Delete'}
                 </button>
               </>
