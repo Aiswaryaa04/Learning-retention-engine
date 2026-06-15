@@ -122,3 +122,93 @@ async def get_question(card_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         "hint": question_data["hint"],
         "answer": question_data["answer"]
     }
+
+@router.get("/reviews/due/{document_id}", response_model=list[ConceptWithCard])
+async def get_due_reviews_by_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get due reviews for a specific document."""
+    
+    now = datetime.now(timezone.utc)
+    
+    result = await db.execute(
+        select(ReviewCard, Concept)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .where(ReviewCard.due_date <= now)
+        .where(Concept.document_id == document_id)
+        .order_by(ReviewCard.due_date)
+    )
+    
+    rows = result.all()
+    
+    due_cards = []
+    for card, concept in rows:
+        due_cards.append(ConceptWithCard(
+            concept_id=concept.id,
+            card_id=card.id,
+            title=concept.title,
+            explanation=concept.explanation,
+            due_date=card.due_date,
+            interval=card.interval,
+            repetitions=card.repetitions
+        ))
+    
+    return due_cards
+
+from app.services.question_service import generate_question, evaluate_answer, get_concept_brushup
+
+@router.post("/reviews/{card_id}/evaluate")
+async def evaluate_user_answer(card_id: uuid.UUID, data: dict, db: AsyncSession = Depends(get_db)):
+    """Evaluate user's answer using Claude."""
+    
+    result = await db.execute(
+        select(ReviewCard, Concept)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .where(ReviewCard.id == card_id)
+    )
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Card not found")
+    
+    card, concept = row
+    
+    loop = asyncio.get_event_loop()
+    feedback = await loop.run_in_executor(
+        None,
+        evaluate_answer,
+        data.get("question", ""),
+        data.get("correct_answer", ""),
+        data.get("user_answer", ""),
+        concept.title
+    )
+    
+    return feedback
+
+
+@router.get("/reviews/{card_id}/brushup")
+async def get_brushup(card_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get a deeper explanation of the concept."""
+    
+    result = await db.execute(
+        select(ReviewCard, Concept)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .where(ReviewCard.id == card_id)
+    )
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Card not found")
+    
+    card, concept = row
+    
+    related_context = await get_related_context(concept.id, db)
+    
+    loop = asyncio.get_event_loop()
+    explanation = await loop.run_in_executor(
+        None,
+        get_concept_brushup,
+        concept.title,
+        concept.explanation,
+        related_context
+    )
+    
+    return {"brushup": explanation}

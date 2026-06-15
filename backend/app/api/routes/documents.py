@@ -9,6 +9,8 @@ from app.schemas.concept import ConceptResponse
 from app.services.claude_service import extract_concepts
 from app.services.embedding_service import get_embedding
 from app.models.review_log import ReviewLog
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from app.services.pdf_service import extract_text_from_pdf
 import uuid
 import asyncio
 
@@ -153,3 +155,65 @@ async def update_document(document_id: uuid.UUID, data: dict, db: AsyncSession =
     await db.commit()
     await db.refresh(document)
     return {"message": "Document updated successfully"}
+    
+from fastapi import Form
+
+@router.post("/documents/upload-pdf", response_model=DocumentResponse)
+async def upload_pdf(
+    title: str = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    
+    """Upload a PDF and extract concepts using Claude."""
+
+    # Read and extract text from PDF
+    file_bytes = await file.read()
+    try:
+        content = extract_text_from_pdf(file_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PDF extraction failed: {str(e)}")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="No text found in PDF")
+
+    # Save document
+    document = Document(
+        id=uuid.uuid4(),
+        title=title,
+        content=content,
+        source_type="pdf"
+    )
+    db.add(document)
+    await db.flush()
+
+    # Extract concepts with Claude
+    try:
+        loop = asyncio.get_event_loop()
+        concepts_data = await loop.run_in_executor(None, extract_concepts, content[:3000])
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
+
+    # Save concepts + embeddings + review cards
+    for concept_data in concepts_data:
+        embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
+        concept = Concept(
+            id=uuid.uuid4(),
+            document_id=document.id,
+            title=concept_data["title"],
+            explanation=concept_data["explanation"],
+            embedding=embedding
+        )
+        db.add(concept)
+        await db.flush()
+
+        card = ReviewCard(
+            id=uuid.uuid4(),
+            concept_id=concept.id
+        )
+        db.add(card)
+
+    await db.commit()
+    await db.refresh(document)
+    return document
