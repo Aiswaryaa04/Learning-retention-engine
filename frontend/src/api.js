@@ -9,3 +9,9 @@ export const getConcepts = (documentId) => api.get(`/documents/${documentId}/con
 export const getDueReviews = () => api.get('/reviews/due')
 export const getQuestion = (cardId) => api.get(`/reviews/${cardId}/question`)
 export const submitReview = (cardId, quality) => api.post(`/reviews/${cardId}/submit`, { quality })
+
+export const getDocuments = () => api.get('/documents')
+export const getDocumentConcepts = (documentId) => api.get(`/documents/${documentId}/concepts`)
+
+export const deleteDocument = (documentId) => api.delete(`/documents/${documentId}`)
+export const updateDocument = (documentId, data) => api.patch(`/documents/${documentId}`, data)

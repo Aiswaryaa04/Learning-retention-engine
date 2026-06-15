@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { uploadDocument, getDueReviews, getQuestion, submitReview } from './api'
+import History from './History'
 import './App.css'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
   const [dueCards, setDueCards] = useState([])
   const [currentQuestion, setCurrentQuestion] = useState(null)
   const [showAnswer, setShowAnswer] = useState(false)
+  const [showHint, setShowHint] = useState(false)
   const [loadingQuestion, setLoadingQuestion] = useState(false)
   const [reviewDone, setReviewDone] = useState(false)
 
@@ -33,6 +35,7 @@ export default function App() {
     setReviewDone(false)
     setCurrentQuestion(null)
     setShowAnswer(false)
+    setShowHint(false)
     const res = await getDueReviews()
     setDueCards(res.data)
     if (res.data.length > 0) {
@@ -43,6 +46,7 @@ export default function App() {
   const loadQuestion = async (cardId) => {
     setLoadingQuestion(true)
     setShowAnswer(false)
+    setShowHint(false)
     try {
       const res = await getQuestion(cardId)
       setCurrentQuestion(res.data)
@@ -66,15 +70,19 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
         Learning Retention Engine
       </h1>
 
       {/* Nav */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 32, justifyContent: 'center' }}>
         <button onClick={() => setView('dashboard')}
           style={{ padding: '8px 16px', background: view === 'dashboard' ? '#000' : '#eee', color: view === 'dashboard' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
           Dashboard
+        </button>
+        <button onClick={() => setView('history')}
+          style={{ padding: '8px 16px', background: view === 'history' ? '#000' : '#eee', color: view === 'history' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+          History
         </button>
         <button onClick={startReview}
           style={{ padding: '8px 16px', background: view === 'review' ? '#000' : '#eee', color: view === 'review' ? '#fff' : '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
@@ -107,11 +115,15 @@ export default function App() {
           {uploadResult && (
             <div style={{ marginTop: 24, padding: 16, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
               <p style={{ fontWeight: 600, color: '#16a34a' }}>✓ Concepts extracted successfully!</p>
-              <p style={{ fontSize: 13, color: '#666' }}>Document ID: {uploadResult.id}</p>
-              <p style={{ fontSize: 13, color: '#666' }}>Click Review to start studying.</p>
+              <p style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Click Review to start studying.</p>
             </div>
           )}
         </div>
+      )}
+
+      {/* History */}
+      {view === 'history' && (
+        <History onReviewDocument={() => startReview()} />
       )}
 
       {/* Review */}
@@ -121,7 +133,7 @@ export default function App() {
             <div style={{ textAlign: 'center', padding: 48 }}>
               <p style={{ fontSize: 48 }}>🎉</p>
               <h2 style={{ fontSize: 22, fontWeight: 700 }}>All done for today!</h2>
-              <p style={{ color: '#666' }}>Come back tomorrow for your next review session.</p>
+              <p style={{ color: '#666', marginTop: 8 }}>Come back tomorrow for your next review session.</p>
               <button onClick={() => setView('dashboard')}
                 style={{ marginTop: 16, padding: '10px 24px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                 Back to Dashboard
@@ -130,43 +142,61 @@ export default function App() {
           )}
 
           {!reviewDone && loadingQuestion && (
-            <p style={{ color: '#666' }}>Generating question...</p>
+            <p style={{ color: '#666', textAlign: 'center', padding: 48 }}>Generating question...</p>
           )}
 
           {!reviewDone && !loadingQuestion && currentQuestion && (
             <div>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
                 {dueCards.length} card{dueCards.length !== 1 ? 's' : ''} remaining
               </p>
+
+              {/* Question */}
               <div style={{ padding: 20, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 16 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase' }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
                   {currentQuestion.concept_title}
                 </p>
-                <p style={{ fontSize: 16, lineHeight: 1.6 }}>{currentQuestion.question}</p>
+                <p style={{ fontSize: 16, lineHeight: 1.7 }}>{currentQuestion.question}</p>
               </div>
 
-              {!showAnswer && (
+              {/* Buttons when nothing shown yet */}
+              {!showAnswer && !showHint && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setShowAnswer(true)}
                     style={{ padding: '10px 20px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                     Show Answer
                   </button>
-                  <button onClick={() => setShowAnswer(true)}
-                    style={{ padding: '10px 20px', background: '#eee', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                  <button onClick={() => setShowHint(true)}
+                    style={{ padding: '10px 20px', background: '#eee', color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                     Show Hint
                   </button>
                 </div>
               )}
 
+              {/* Hint only */}
+              {showHint && !showAnswer && (
+                <div>
+                  <div style={{ padding: 16, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 12 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>HINT</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.6 }}>{currentQuestion.hint}</p>
+                  </div>
+                  <button onClick={() => setShowAnswer(true)}
+                    style={{ padding: '10px 20px', background: '#000', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                    Show Answer
+                  </button>
+                </div>
+              )}
+
+              {/* Answer + grading */}
               {showAnswer && (
                 <div>
-                  <div style={{ padding: 16, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 16 }}>
+                  <div style={{ padding: 16, background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a', marginBottom: 12 }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>HINT</p>
-                    <p style={{ fontSize: 14 }}>{currentQuestion.hint}</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.6 }}>{currentQuestion.hint}</p>
                   </div>
                   <div style={{ padding: 16, background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', marginBottom: 20 }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#166534', marginBottom: 8 }}>ANSWER</p>
-                    <p style={{ fontSize: 14, lineHeight: 1.6 }}>{currentQuestion.answer}</p>
+                    <p style={{ fontSize: 14, lineHeight: 1.7 }}>{currentQuestion.answer}</p>
                   </div>
 
                   <p style={{ fontWeight: 600, marginBottom: 12 }}>How well did you know this?</p>
@@ -191,8 +221,8 @@ export default function App() {
           {!reviewDone && !loadingQuestion && dueCards.length === 0 && !currentQuestion && (
             <div style={{ textAlign: 'center', padding: 48 }}>
               <p style={{ fontSize: 48 }}>✅</p>
-              <h2>No reviews due!</h2>
-              <p style={{ color: '#666' }}>Upload some study material to get started.</p>
+              <h2 style={{ marginTop: 8 }}>No reviews due!</h2>
+              <p style={{ color: '#666', marginTop: 8 }}>Upload some study material to get started.</p>
             </div>
           )}
         </div>
