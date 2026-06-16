@@ -5,7 +5,8 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=True,
     connect_args={
-        "statement_cache_size": 0
+        "statement_cache_size": 0,
+        "ssl": "require"
     }
 )
 
