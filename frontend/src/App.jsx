@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { uploadDocument, uploadPDF, getDueReviews, getDueReviewsByDocument, getQuestion, submitReview, evaluateAnswer, getBrushup, getDocuments } from './api'
+import { uploadDocument, uploadPDF, uploadYouTube, getDueReviews, getDueReviewsByDocument, getQuestion, submitReview, evaluateAnswer, getBrushup, getConcepts } from './api'
 import History from './History'
 import Stats from './Stats'
 import './App.css'
@@ -31,20 +31,14 @@ const Sidebar = ({ view, setView, startReview }) => (
       <button key={item.id}
         onClick={() => item.id === 'review' ? startReview() : setView(item.id)}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
+          display: 'flex', alignItems: 'center', gap: 10,
           padding: '10px 12px',
           background: view === item.id ? '#f3f4f6' : 'transparent',
-          border: 'none',
-          borderRadius: 8,
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontSize: 14,
+          border: 'none', borderRadius: 8, cursor: 'pointer',
+          textAlign: 'left', fontSize: 14,
           fontWeight: view === item.id ? 600 : 400,
           color: view === item.id ? '#111827' : '#6b7280',
-          width: '100%',
-          transition: 'all 0.15s',
+          width: '100%', transition: 'all 0.15s',
           fontFamily: 'Inter, sans-serif'
         }}>
         <span style={{ fontSize: 16 }}>{item.icon}</span>
@@ -75,6 +69,8 @@ export default function App() {
   const [uploadMode, setUploadMode] = useState('text')
   const [pdfFile, setPdfFile] = useState(null)
   const [uploadingPdf, setUploadingPdf] = useState(false)
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [uploadingYoutube, setUploadingYoutube] = useState(false)
   const [reviewingDocumentId, setReviewingDocumentId] = useState(null)
   const [userAnswer, setUserAnswer] = useState('')
   const [feedback, setFeedback] = useState(null)
@@ -83,12 +79,20 @@ export default function App() {
   const [loadingBrushup, setLoadingBrushup] = useState(false)
   const [showBrushup, setShowBrushup] = useState(false)
   const [totalCards, setTotalCards] = useState(0)
-
-  // Concept viewer states
   const [concepts, setConcepts] = useState([])
-  const [studyMode, setStudyMode] = useState(null) // null | 'viewer' | 'stepbystep'
+  const [studyMode, setStudyMode] = useState(null)
   const [studyIndex, setStudyIndex] = useState(0)
   const [studyDocId, setStudyDocId] = useState(null)
+
+  const loadConceptsForDoc = async (docId) => {
+    try {
+      const res = await getConcepts(docId)
+      setConcepts(res.data)
+      setStudyDocId(docId)
+    } catch (err) {
+      console.error('Failed to load concepts', err)
+    }
+  }
 
   const handleUpload = async () => {
     if (!title || !content) return
@@ -122,15 +126,20 @@ export default function App() {
     setUploadingPdf(false)
   }
 
-  const loadConceptsForDoc = async (docId) => {
+  const handleYoutubeUpload = async () => {
+    if (!title || !youtubeUrl) return
+    setUploadingYoutube(true)
     try {
-      const { getConcepts } = await import('./api')
-      const res = await getConcepts(docId)
-      setConcepts(res.data)
-      setStudyDocId(docId)
+      const res = await uploadYouTube({ title, url: youtubeUrl })
+      setUploadResult(res.data)
+      setUploadedDocId(res.data.id)
+      setTitle('')
+      setYoutubeUrl('')
+      await loadConceptsForDoc(res.data.id)
     } catch (err) {
-      console.error('Failed to load concepts', err)
+      alert('YouTube upload failed: ' + err.message)
     }
+    setUploadingYoutube(false)
   }
 
   const startReview = async () => {
@@ -167,7 +176,6 @@ export default function App() {
     setStudyMode('stepbystep')
     setStudyIndex(0)
     try {
-      const { getConcepts } = await import('./api')
       const res = await getConcepts(documentId)
       setConcepts(res.data)
     } catch (err) {
@@ -259,19 +267,24 @@ export default function App() {
             <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 32, maxWidth: 640 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Add Study Material</h2>
 
+              {/* Mode toggle */}
               <div style={{ display: 'flex', gap: 0, marginBottom: 20, background: '#f3f4f6', borderRadius: 8, padding: 4, width: 'fit-content' }}>
-                {['text', 'pdf'].map(mode => (
-                  <button key={mode} onClick={() => setUploadMode(mode)}
+                {[
+                  { id: 'text', label: 'Paste Text' },
+                  { id: 'pdf', label: 'Upload PDF' },
+                  { id: 'youtube', label: '▶ YouTube' },
+                ].map(mode => (
+                  <button key={mode.id} onClick={() => setUploadMode(mode.id)}
                     style={{
                       padding: '6px 20px',
-                      background: uploadMode === mode ? '#fff' : 'transparent',
+                      background: uploadMode === mode.id ? '#fff' : 'transparent',
                       border: 'none', borderRadius: 6, cursor: 'pointer',
-                      fontSize: 13, fontWeight: uploadMode === mode ? 600 : 400,
-                      color: uploadMode === mode ? '#111827' : '#6b7280',
-                      boxShadow: uploadMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      fontSize: 13, fontWeight: uploadMode === mode.id ? 600 : 400,
+                      color: uploadMode === mode.id ? '#111827' : '#6b7280',
+                      boxShadow: uploadMode === mode.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                       fontFamily: 'Inter, sans-serif'
                     }}>
-                    {mode === 'text' ? 'Paste Text' : 'Upload PDF'}
+                    {mode.label}
                   </button>
                 ))}
               </div>
@@ -287,7 +300,7 @@ export default function App() {
                 }}
               />
 
-              {uploadMode === 'text' ? (
+              {uploadMode === 'text' && (
                 <>
                   <textarea
                     placeholder="Paste your notes, article, book chapter, or any text..."
@@ -311,7 +324,9 @@ export default function App() {
                     {uploading ? '⏳ Extracting concepts...' : '✦ Extract Concepts with AI'}
                   </button>
                 </>
-              ) : (
+              )}
+
+              {uploadMode === 'pdf' && (
                 <>
                   <div onClick={() => document.getElementById('pdf-input').click()}
                     style={{
@@ -339,7 +354,43 @@ export default function App() {
                 </>
               )}
 
-              {/* Success + concept viewer options */}
+              {uploadMode === 'youtube' && (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{
+                      border: '1px solid #e5e7eb', borderRadius: 10,
+                      padding: '20px 24px', background: '#fafafa', marginBottom: 12
+                    }}>
+                      <p style={{ fontSize: 28, marginBottom: 8, textAlign: 'center' }}>▶</p>
+                      <input
+                        placeholder="Paste YouTube URL here... (e.g. https://youtube.com/watch?v=...)"
+                        value={youtubeUrl}
+                        onChange={e => setYoutubeUrl(e.target.value)}
+                        style={{
+                          width: '100%', padding: '10px 14px',
+                          border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14,
+                          boxSizing: 'border-box', outline: 'none',
+                          fontFamily: 'Inter, sans-serif', background: '#fff'
+                        }}
+                      />
+                      <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+                        Works with any YouTube video that has captions or auto-generated subtitles.
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={handleYoutubeUpload} disabled={uploadingYoutube || !youtubeUrl || !title}
+                    style={{
+                      padding: '10px 24px', background: '#111827', color: '#fff',
+                      border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+                      fontWeight: 500, opacity: (!youtubeUrl || !title) ? 0.5 : 1,
+                      fontFamily: 'Inter, sans-serif'
+                    }}>
+                    {uploadingYoutube ? '⏳ Fetching transcript...' : '✦ Extract Concepts from Video'}
+                  </button>
+                </>
+              )}
+
+              {/* Success + concept viewer */}
               {uploadResult && concepts.length > 0 && (
                 <div style={{ marginTop: 20 }}>
                   <div style={{ padding: '14px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', marginBottom: 16 }}>
@@ -348,7 +399,6 @@ export default function App() {
                     </p>
                   </div>
 
-                  {/* Concept viewer — all concepts */}
                   <div style={{ marginBottom: 16 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
                       What was extracted:
@@ -356,10 +406,8 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {concepts.map((concept, i) => (
                         <div key={concept.id} style={{
-                          padding: '12px 16px',
-                          background: '#f9fafb',
-                          borderRadius: 8,
-                          border: '1px solid #e5e7eb'
+                          padding: '12px 16px', background: '#f9fafb',
+                          borderRadius: 8, border: '1px solid #e5e7eb'
                         }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: '#111827', marginBottom: 4 }}>
                             {i + 1}. {concept.title}
@@ -372,7 +420,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Study options */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => startStudyFirst(uploadedDocId)}
                       style={{
@@ -397,11 +444,10 @@ export default function App() {
               )}
             </div>
 
-            {/* How it works */}
             {!uploadResult && (
               <div style={{ display: 'flex', gap: 16, marginTop: 32, maxWidth: 640 }}>
                 {[
-                  { icon: '1', text: 'Upload any study material' },
+                  { icon: '1', text: 'Upload text, PDF, or YouTube video' },
                   { icon: '2', text: 'AI extracts key concepts' },
                   { icon: '3', text: 'Review at the right time' },
                 ].map((item, i) => (
@@ -476,10 +522,7 @@ export default function App() {
                       Next →
                     </button>
                   ) : (
-                    <button onClick={() => {
-                      setStudyMode(null)
-                      startDocumentReview(studyDocId)
-                    }}
+                    <button onClick={() => { setStudyMode(null); startDocumentReview(studyDocId) }}
                       style={{ flex: 1, padding: '10px 20px', background: '#111827', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                       ⚡ Start Review Quiz
                     </button>
@@ -587,8 +630,10 @@ export default function App() {
 
                     {feedback && (
                       <div style={{
-                        padding: '16px 20px', background: feedbackStyles[feedback.score]?.bg || '#f9fafb',
-                        borderRadius: 10, border: `1px solid ${feedbackStyles[feedback.score]?.border || '#e5e7eb'}`,
+                        padding: '16px 20px',
+                        background: feedbackStyles[feedback.score]?.bg || '#f9fafb',
+                        borderRadius: 10,
+                        border: `1px solid ${feedbackStyles[feedback.score]?.border || '#e5e7eb'}`,
                         marginBottom: 16
                       }}>
                         <p style={{ fontSize: 13, fontWeight: 700, color: feedbackStyles[feedback.score]?.color || '#374151', marginBottom: 8 }}>

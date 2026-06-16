@@ -10,6 +10,7 @@ from app.schemas.document import DocumentCreate, DocumentResponse
 from app.schemas.concept import ConceptResponse
 from app.services.claude_service import extract_concepts
 from app.services.embedding_service import get_embedding
+from app.services.youtube_service import get_youtube_transcript
 from app.services.pdf_service import extract_text_from_pdf
 import uuid
 import asyncio

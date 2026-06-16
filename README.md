@@ -26,7 +26,7 @@ The problem is that doing both manually is too much friction. You have to create
 
 ## What It Does
 
-Upload any study material — notes, a PDF, a book chapter, anything. Retention reads it, extracts the key concepts automatically, and builds a review schedule tailored to your performance.
+Upload any study material — notes, a PDF, a book chapter, a YouTube video. Retention reads it, extracts the key concepts automatically, and builds a review schedule tailored to your performance.
 
 When it's time to review, it doesn't just show you a flashcard. It generates a question grounded in your specific material, makes you write an answer, evaluates what you got right and wrong, and schedules the next review based on how well you did.
 
@@ -37,7 +37,7 @@ Come back the next day — only the concepts you're about to forget are waiting 
 ## How It Works
 
 ### Step 1 — Upload
-Paste text or upload a PDF. Claude AI reads the content and extracts 3-8 key concepts with clear explanations. No manual flashcard creation.
+Paste text, upload a PDF, or paste a YouTube URL. Claude AI reads the content and extracts 3-8 key concepts with clear explanations. No manual flashcard creation.
 
 ### Step 2 — Study (optional)
 Before the quiz starts, browse all extracted concepts one by one. Read, understand, then move to the quiz when ready.
@@ -76,7 +76,7 @@ When it's time to quiz you on a concept, it:
 1. Takes that concept's vector embedding
 2. Searches the database for the 3 most semantically similar concepts using cosine similarity
 3. Sends those related concepts as context to Claude
-4. Claude generates a question grounded in *your actual study material*
+4. Claude generates a question grounded in your actual study material
 
 The result is questions that are specific to what you studied — not generic questions about the topic.
 
@@ -90,6 +90,10 @@ After each review, three values update per concept:
 
 Score below 3 (forgot it) → interval resets to 1 day. Score 3-5 → interval multiplies by easiness factor. Over time, concepts you know well disappear for weeks. Concepts you struggle with come back daily.
 
+### YouTube Support
+
+Paste any YouTube URL. The backend fetches the video transcript using the YouTube Transcript API, sends the first 3000 characters to Claude for concept extraction, and the rest of the pipeline runs identically to text or PDF uploads. Works with any video that has captions or auto-generated subtitles.
+
 ---
 
 ## Stack
@@ -101,6 +105,7 @@ Score below 3 (forgot it) → interval resets to 1 day. Score 3-5 → interval m
 | Database | PostgreSQL + pgvector |
 | LLM | Claude claude-sonnet-4-6 (Anthropic) |
 | Algorithm | SM-2 Spaced Repetition |
+| Content Sources | Text, PDF (PyMuPDF), YouTube (youtube-transcript-api) |
 | Hosting | Vercel + Render + Supabase |
 | Container | Docker |
 
@@ -119,6 +124,9 @@ Making users write an answer before seeing the correct one forces genuine memory
 
 **Claude for answer evaluation**
 A simple string comparison can't evaluate whether an answer is conceptually correct. Claude reads the user's response and gives specific, contextual feedback — this is the feature that makes the learning actually work.
+
+**YouTube transcripts over video processing**
+Fetching transcripts is free, instant, and requires no video processing infrastructure. The tradeoff is that videos without captions won't work — but the vast majority of educational content on YouTube has auto-generated subtitles.
 
 ---
 
