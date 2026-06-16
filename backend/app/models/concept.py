@@ -12,5 +12,5 @@ class Concept(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
     title = Column(String(500), nullable=False)
     explanation = Column(Text, nullable=False)
-    embedding = Column(Vector(384))
+    embedding = Column(Vector(768))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
