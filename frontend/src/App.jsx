@@ -3,6 +3,7 @@ import { uploadDocument, uploadPDF, uploadYouTube, getDueReviews, getDueReviewsB
 import History from './History'
 import Stats from './Stats'
 import './App.css'
+import RetentionChart from './RetentionChart'
 
 const Sidebar = ({ view, setView, startReview }) => (
   <div style={{
@@ -274,7 +275,15 @@ export default function App() {
                   { id: 'pdf', label: 'Upload PDF' },
                   { id: 'youtube', label: '▶ YouTube' },
                 ].map(mode => (
-                  <button key={mode.id} onClick={() => setUploadMode(mode.id)}
+                  <button key={mode.id} onClick={() => {
+                    setUploadMode(mode.id)
+                    setUploadResult(null)
+                    setConcepts([])
+                    setTitle('')
+                    setContent('')
+                    setPdfFile(null)
+                    setYoutubeUrl('')
+               }}
                     style={{
                       padding: '6px 20px',
                       background: uploadMode === mode.id ? '#fff' : 'transparent',
@@ -462,6 +471,8 @@ export default function App() {
             )}
 
             <Stats onStartReview={startReview} />
+            <RetentionChart />
+
           </div>
         )}
 

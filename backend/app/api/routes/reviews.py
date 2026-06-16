@@ -263,3 +263,27 @@ async def get_review_stats(db: AsyncSession = Depends(get_db)):
         "total_concepts": len(rows),
         "needs_attention": len(due_today) + len(overdue) + len(at_risk)
     }
+
+@router.get("/reviews/history")
+async def get_review_history(db: AsyncSession = Depends(get_db)):
+    """Get review history for the retention curve chart."""
+    
+    result = await db.execute(
+        select(ReviewLog, ReviewCard, Concept)
+        .join(ReviewCard, ReviewLog.review_card_id == ReviewCard.id)
+        .join(Concept, ReviewCard.concept_id == Concept.id)
+        .order_by(ReviewLog.reviewed_at)
+    )
+    rows = result.all()
+    
+    history = []
+    for log, card, concept in rows:
+        history.append({
+            "concept_title": concept.title,
+            "quality": log.quality,
+            "reviewed_at": log.reviewed_at.isoformat(),
+            "interval": card.interval,
+            "easiness_factor": card.easiness_factor
+        })
+    
+    return history

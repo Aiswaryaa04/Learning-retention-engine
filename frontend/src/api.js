@@ -25,3 +25,4 @@ export const uploadPDF = (title, file) => {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+export const getReviewHistory = () => api.get('/reviews/history')

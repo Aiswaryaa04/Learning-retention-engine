@@ -1,8 +1,8 @@
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
 import re
 
 def extract_video_id(url: str) -> str:
-    """Extract video ID from YouTube URL."""
     patterns = [
         r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([^&\n?#]+)',
     ]
@@ -13,11 +13,14 @@ def extract_video_id(url: str) -> str:
     raise ValueError("Invalid YouTube URL")
 
 def get_youtube_transcript(url: str) -> str:
-    """Fetch transcript from a YouTube video."""
     video_id = extract_video_id(url)
-    
-    transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-    
-    # Join all transcript pieces into one text
-    transcript = " ".join([entry["text"] for entry in transcript_list])
-    return transcript
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        transcript = " ".join([entry["text"] for entry in transcript_list])
+        return transcript
+    except TranscriptsDisabled:
+        raise ValueError("This video has disabled transcripts. Try a different video.")
+    except NoTranscriptFound:
+        raise ValueError("No transcript found for this video. Try a video with captions enabled.")
+    except Exception as e:
+        raise ValueError(f"YouTube is blocking transcript access from this server. Try pasting the transcript manually as text instead.")

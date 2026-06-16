@@ -40,19 +40,19 @@ Come back the next day — only the concepts you're about to forget are waiting 
 Paste text, upload a PDF, or paste a YouTube URL. Claude AI reads the content and extracts 3-8 key concepts with clear explanations. No manual flashcard creation.
 
 ### Step 2 — Study (optional)
-Before the quiz starts, browse all extracted concepts one by one. Read, understand, then move to the quiz when ready.
+Before the quiz starts, browse all extracted concepts one by one. Read and understand each one, then move to the quiz when ready.
 
 ### Step 3 — Active Recall
-For each concept, a question is generated — not from Claude's general knowledge, but from your specific material using a RAG pipeline. You type your answer before seeing the correct one.
+For each concept, a question is generated using a RAG pipeline grounded in your specific material. You type your answer before seeing the correct one.
 
 ### Step 4 — AI Feedback
 Claude reads your answer and tells you exactly what you got right, what you missed, and gives you a memorable tip. This is meaningfully different from flipping a flashcard and deciding "yeah I knew that."
 
 ### Step 5 — Scheduling
-You grade yourself (Forgot / Hard / Good / Easy). The SM-2 algorithm calculates when you should see this concept again — tomorrow if you struggled, weeks later if you aced it.
+You grade yourself — Forgot, Hard, Good, or Easy. The SM-2 algorithm calculates when you should see this concept again. Tomorrow if you struggled. Weeks later if you aced it.
 
-### Step 6 — Forgetting Risk
-The dashboard shows which concepts are at risk of being forgotten before you've actually forgotten them. Red means review now. Green means you're safe.
+### Step 6 — Forgetting Risk + Retention Curve
+The dashboard shows which concepts are at risk of being forgotten before you've actually forgotten them. A retention curve chart visualizes your memory strength over time for each concept — showing exactly how your recall improves or decays across review sessions.
 
 ---
 
@@ -90,9 +90,13 @@ After each review, three values update per concept:
 
 Score below 3 (forgot it) → interval resets to 1 day. Score 3-5 → interval multiplies by easiness factor. Over time, concepts you know well disappear for weeks. Concepts you struggle with come back daily.
 
+### The Retention Curve
+
+Every review session is logged with a quality score (0-5). The dashboard converts these into retention percentages and plots them on a line chart over time — one line per concept. You can toggle individual concepts on and off to track your memory of specific ideas.
+
 ### YouTube Support
 
-Paste any YouTube URL. The backend fetches the video transcript using the YouTube Transcript API, sends the first 3000 characters to Claude for concept extraction, and the rest of the pipeline runs identically to text or PDF uploads. Works with any video that has captions or auto-generated subtitles.
+Paste any YouTube URL. The backend fetches the video transcript, sends the first 3000 characters to Claude for concept extraction, and the pipeline runs identically to text or PDF uploads. Works with any video that has captions or auto-generated subtitles.
 
 ---
 
@@ -100,7 +104,7 @@ Paste any YouTube URL. The backend fetches the video transcript using the YouTub
 
 | Layer | Technology |
 |---|---|
-| Frontend | React + Vite |
+| Frontend | React + Vite + Recharts |
 | Backend | FastAPI (Python) |
 | Database | PostgreSQL + pgvector |
 | LLM | Claude claude-sonnet-4-6 (Anthropic) |
@@ -126,7 +130,7 @@ Making users write an answer before seeing the correct one forces genuine memory
 A simple string comparison can't evaluate whether an answer is conceptually correct. Claude reads the user's response and gives specific, contextual feedback — this is the feature that makes the learning actually work.
 
 **YouTube transcripts over video processing**
-Fetching transcripts is free, instant, and requires no video processing infrastructure. The tradeoff is that videos without captions won't work — but the vast majority of educational content on YouTube has auto-generated subtitles.
+Fetching transcripts is free, instant, and requires no video processing infrastructure. The tradeoff is that videos without captions won't work and some cloud server IPs get blocked by YouTube's anti-scraping measures — in production this would route through a proxy or use YouTube's official API with OAuth.
 
 ---
 
