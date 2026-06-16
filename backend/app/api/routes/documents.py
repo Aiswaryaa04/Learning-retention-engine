@@ -119,6 +119,59 @@ async def upload_pdf(
     await db.refresh(document)
     return document
 
+@router.post("/documents/youtube", response_model=DocumentResponse)
+async def upload_youtube(data: dict, db: AsyncSession = Depends(get_db)):
+    """Fetch YouTube transcript and extract concepts."""
+    
+    url = data.get("url")
+    title = data.get("title")
+    
+    if not url or not title:
+        raise HTTPException(status_code=400, detail="URL and title are required")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        transcript = await loop.run_in_executor(None, get_youtube_transcript, url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not fetch transcript: {str(e)}")
+    
+    if not transcript:
+        raise HTTPException(status_code=400, detail="No transcript found for this video")
+    
+    document = Document(
+        id=uuid.uuid4(),
+        title=title,
+        content=transcript[:5000],  # limit to first 5000 chars
+        source_type="youtube",
+        source_url=url
+    )
+    db.add(document)
+    await db.flush()
+    
+    try:
+        loop = asyncio.get_event_loop()
+        concepts_data = await loop.run_in_executor(None, extract_concepts, transcript[:3000])
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
+    
+    for concept_data in concepts_data:
+        embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
+        concept = Concept(
+            id=uuid.uuid4(),
+            document_id=document.id,
+            title=concept_data["title"],
+            explanation=concept_data["explanation"],
+            embedding=embedding
+        )
+        db.add(concept)
+        await db.flush()
+        card = ReviewCard(id=uuid.uuid4(), concept_id=concept.id)
+        db.add(card)
+    
+    await db.commit()
+    await db.refresh(document)
+    return document
 
 @router.get("/documents", response_model=list[dict])
 async def get_documents(db: AsyncSession = Depends(get_db)):
