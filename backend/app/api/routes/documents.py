@@ -12,6 +12,7 @@ from app.services.claude_service import extract_concepts
 from app.services.embedding_service import get_embedding
 from app.services.youtube_service import get_youtube_transcript
 from app.services.pdf_service import extract_text_from_pdf
+from app.services.url_service import scrape_url
 import uuid
 import asyncio
 
@@ -151,6 +152,60 @@ async def upload_youtube(data: dict, db: AsyncSession = Depends(get_db)):
     try:
         loop = asyncio.get_event_loop()
         concepts_data = await loop.run_in_executor(None, extract_concepts, transcript[:3000])
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")
+    
+    for concept_data in concepts_data:
+        embedding = get_embedding(concept_data["title"] + " " + concept_data["explanation"])
+        concept = Concept(
+            id=uuid.uuid4(),
+            document_id=document.id,
+            title=concept_data["title"],
+            explanation=concept_data["explanation"],
+            embedding=embedding
+        )
+        db.add(concept)
+        await db.flush()
+        card = ReviewCard(id=uuid.uuid4(), concept_id=concept.id)
+        db.add(card)
+    
+    await db.commit()
+    await db.refresh(document)
+    return document
+
+@router.post("/documents/url", response_model=DocumentResponse)
+async def upload_url(data: dict, db: AsyncSession = Depends(get_db)):
+    """Scrape a URL and extract concepts."""
+    
+    url = data.get("url")
+    title = data.get("title")
+    
+    if not url or not title:
+        raise HTTPException(status_code=400, detail="URL and title are required")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        content = await loop.run_in_executor(None, scrape_url, url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    if not content or len(content) < 50:
+        raise HTTPException(status_code=400, detail="Could not extract enough content from this URL. Try copying the text manually.")
+    
+    document = Document(
+        id=uuid.uuid4(),
+        title=title,
+        content=content,
+        source_type="url",
+        source_url=url
+    )
+    db.add(document)
+    await db.flush()
+    
+    try:
+        loop = asyncio.get_event_loop()
+        concepts_data = await loop.run_in_executor(None, extract_concepts, content[:3000])
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Claude extraction failed: {str(e)}")

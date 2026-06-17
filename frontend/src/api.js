@@ -17,6 +17,7 @@ export const deleteDocument = (documentId) => api.delete(`/documents/${documentI
 export const updateDocument = (documentId, data) => api.patch(`/documents/${documentId}`, data)
 export const getReviewStats = () => api.get('/reviews/stats')
 export const uploadYouTube = (data) => api.post('/documents/youtube', data)
+export const uploadURL = (data) => api.post('/documents/url', data)
 export const uploadPDF = (title, file) => {
   const formData = new FormData()
   formData.append('title', title)

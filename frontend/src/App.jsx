@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { uploadDocument, uploadPDF, uploadYouTube, getDueReviews, getDueReviewsByDocument, getQuestion, submitReview, evaluateAnswer, getBrushup, getConcepts } from './api'
+import { uploadDocument, uploadPDF, uploadYouTube, uploadURL, getDueReviews, getDueReviewsByDocument, getQuestion, submitReview, evaluateAnswer, getBrushup, getConcepts } from './api'
 import History from './History'
 import Stats from './Stats'
-import './App.css'
 import RetentionChart from './RetentionChart'
+import './App.css'
 
 const Sidebar = ({ view, setView, startReview }) => (
   <div style={{
@@ -72,6 +72,8 @@ export default function App() {
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [uploadingYoutube, setUploadingYoutube] = useState(false)
+  const [webUrl, setWebUrl] = useState('')
+  const [uploadingUrl, setUploadingUrl] = useState(false)
   const [reviewingDocumentId, setReviewingDocumentId] = useState(null)
   const [userAnswer, setUserAnswer] = useState('')
   const [feedback, setFeedback] = useState(null)
@@ -141,6 +143,22 @@ export default function App() {
       alert('YouTube upload failed: ' + err.message)
     }
     setUploadingYoutube(false)
+  }
+
+  const handleUrlUpload = async () => {
+    if (!title || !webUrl) return
+    setUploadingUrl(true)
+    try {
+      const res = await uploadURL({ title, url: webUrl })
+      setUploadResult(res.data)
+      setUploadedDocId(res.data.id)
+      setTitle('')
+      setWebUrl('')
+      await loadConceptsForDoc(res.data.id)
+    } catch (err) {
+      alert('URL upload failed: ' + err.message)
+    }
+    setUploadingUrl(false)
   }
 
   const startReview = async () => {
@@ -251,6 +269,17 @@ export default function App() {
 
   const progress = totalCards > 0 ? ((totalCards - dueCards.length) / totalCards) * 100 : 0
 
+  const resetUploadState = (mode) => {
+    setUploadMode(mode)
+    setUploadResult(null)
+    setConcepts([])
+    setTitle('')
+    setContent('')
+    setPdfFile(null)
+    setYoutubeUrl('')
+    setWebUrl('')
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar view={view} setView={setView} startReview={startReview} />
@@ -274,18 +303,11 @@ export default function App() {
                   { id: 'text', label: 'Paste Text' },
                   { id: 'pdf', label: 'Upload PDF' },
                   { id: 'youtube', label: '▶ YouTube' },
+                  { id: 'url', label: '🔗 Web URL' },
                 ].map(mode => (
-                  <button key={mode.id} onClick={() => {
-                    setUploadMode(mode.id)
-                    setUploadResult(null)
-                    setConcepts([])
-                    setTitle('')
-                    setContent('')
-                    setPdfFile(null)
-                    setYoutubeUrl('')
-               }}
+                  <button key={mode.id} onClick={() => resetUploadState(mode.id)}
                     style={{
-                      padding: '6px 20px',
+                      padding: '6px 16px',
                       background: uploadMode === mode.id ? '#fff' : 'transparent',
                       border: 'none', borderRadius: 6, cursor: 'pointer',
                       fontSize: 13, fontWeight: uploadMode === mode.id ? 600 : 400,
@@ -372,7 +394,7 @@ export default function App() {
                     }}>
                       <p style={{ fontSize: 28, marginBottom: 8, textAlign: 'center' }}>▶</p>
                       <input
-                        placeholder="Paste YouTube URL here... (e.g. https://youtube.com/watch?v=...)"
+                        placeholder="Paste YouTube URL... (e.g. https://youtube.com/watch?v=...)"
                         value={youtubeUrl}
                         onChange={e => setYoutubeUrl(e.target.value)}
                         style={{
@@ -395,6 +417,42 @@ export default function App() {
                       fontFamily: 'Inter, sans-serif'
                     }}>
                     {uploadingYoutube ? '⏳ Fetching transcript...' : '✦ Extract Concepts from Video'}
+                  </button>
+                </>
+              )}
+
+              {uploadMode === 'url' && (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{
+                      border: '1px solid #e5e7eb', borderRadius: 10,
+                      padding: '20px 24px', background: '#fafafa', marginBottom: 12
+                    }}>
+                      <p style={{ fontSize: 28, marginBottom: 8, textAlign: 'center' }}>🔗</p>
+                      <input
+                        placeholder="Paste any webpage URL... (e.g. https://example.com/article)"
+                        value={webUrl}
+                        onChange={e => setWebUrl(e.target.value)}
+                        style={{
+                          width: '100%', padding: '10px 14px',
+                          border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14,
+                          boxSizing: 'border-box', outline: 'none',
+                          fontFamily: 'Inter, sans-serif', background: '#fff'
+                        }}
+                      />
+                      <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+                        Works with articles, blog posts, documentation, and most public webpages.
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={handleUrlUpload} disabled={uploadingUrl || !webUrl || !title}
+                    style={{
+                      padding: '10px 24px', background: '#111827', color: '#fff',
+                      border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14,
+                      fontWeight: 500, opacity: (!webUrl || !title) ? 0.5 : 1,
+                      fontFamily: 'Inter, sans-serif'
+                    }}>
+                    {uploadingUrl ? '⏳ Extracting from webpage...' : '✦ Extract Concepts from URL'}
                   </button>
                 </>
               )}
@@ -456,7 +514,7 @@ export default function App() {
             {!uploadResult && (
               <div style={{ display: 'flex', gap: 16, marginTop: 32, maxWidth: 640 }}>
                 {[
-                  { icon: '1', text: 'Upload text, PDF, or YouTube video' },
+                  { icon: '1', text: 'Upload text, PDF, YouTube, or any URL' },
                   { icon: '2', text: 'AI extracts key concepts' },
                   { icon: '3', text: 'Review at the right time' },
                 ].map((item, i) => (
@@ -472,7 +530,6 @@ export default function App() {
 
             <Stats onStartReview={startReview} />
             <RetentionChart />
-
           </div>
         )}
 
