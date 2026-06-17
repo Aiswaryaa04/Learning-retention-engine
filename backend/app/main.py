@@ -12,7 +12,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://learning-retention-engine.vercel.app"
+        "https://learning-retention-engine.vercel.app",
         "https://learning-retention-engine-2lw7t7omh-aiswaryaa04s-projects.vercel.app"
     ],
     allow_credentials=True,
